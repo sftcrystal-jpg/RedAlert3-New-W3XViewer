@@ -1,0 +1,6 @@
+*.cmd text eol=crlf
+*.ps binary
+*.exe binary
+*.xsd -text
+/LICENSE text eol=lf
+/LICENSES/*.md text eol=lf

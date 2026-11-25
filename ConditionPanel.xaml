@@ -1,0 +1,55 @@
+<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <StackPanel.Resources>
+  <Style x:Key="DrawEditorRow" TargetType="ListBoxItem">
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+    <Border Name="Row" Padding="5,3"><ContentPresenter/></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="#31594F"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </StackPanel.Resources>
+ <WrapPanel><Button Name="OpenConfig" Content="打开单位 XML"/><Button Name="Assets" Content="补充 W3X" Margin="6,0,0,0"/></WrapPanel>
+ <TextBlock Text="绘制模块 · 勾选显示，点名称编辑" Margin="0,10,0,3"/>
+ <ListBox Name="Modules" MaxHeight="158" Background="#182228" Foreground="#E0EBEC" BorderBrush="#405058" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" ItemContainerStyle="{StaticResource DrawEditorRow}">
+ </ListBox>
+ <TextBlock Text="预览条件（空格分隔）" Margin="0,10,0,3"/>
+ <DockPanel><Button Name="Match" Content="匹配" DockPanel.Dock="Right" Margin="6,0,0,0"/><TextBox Name="Flags"/></DockPanel>
+ <DockPanel Margin="0,4,0,0"><Button Name="AppendFlag" Content="加入条件" DockPanel.Dock="Right" Margin="6,0,0,0"/><ComboBox Name="FlagsCatalog" IsEditable="True" MaxDropDownHeight="220"/></DockPanel>
+ <TextBlock Name="ModelMatch" Foreground="#8CE0C2" TextWrapping="Wrap" Margin="0,8,0,0"/>
+ <DockPanel Margin="0,8,0,4">
+  <Button Name="NewState" DockPanel.Dock="Right" Content="＋ 新增动画状态" Padding="9,3" Background="#7BE1C6" Foreground="#142C27" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="先选择支持动画状态的 Draw"/>
+  <TextBlock Name="StatesLabel" Text="动画状态 · 从上往下匹配" VerticalAlignment="Center"/>
+ </DockPanel>
+ <DockPanel>
+  <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0">
+   <Button Name="StateUp" Content="↑ 上移" IsEnabled="False" Padding="7,3" ToolTip="将所选动画状态在 XML 中上移一位"/>
+   <Button Name="StateDown" Content="↓ 下移" IsEnabled="False" Margin="0,4,0,0" Padding="7,3" ToolTip="将所选动画状态在 XML 中下移一位"/>
+  </StackPanel>
+  <ListBox Name="States" MaxHeight="120" Background="#182228" Foreground="#E0EBEC" BorderBrush="#405058" ScrollViewer.HorizontalScrollBarVisibility="Auto" ItemContainerStyle="{StaticResource DrawEditorRow}" AutomationProperties.Name="动画状态，按 XML 顺序排列"/>
+ </DockPanel>
+ <TextBlock Name="MatchedState" Foreground="#8CE0C2" TextWrapping="Wrap" Margin="0,4,0,0"/>
+ <DockPanel Margin="0,6,0,4">
+  <Button Name="NewAction" DockPanel.Dock="Right" Content="＋ 添加动作" Padding="9,3" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="先选择一个动画状态"/>
+  <TextBlock Name="AnimationsLabel" Text="此 Draw 的全部动作" VerticalAlignment="Center"/>
+ </DockPanel>
+ <DockPanel><Button Name="PreviewAction" DockPanel.Dock="Right" Content="预览" Margin="6,0,0,0" Padding="10,3" IsEnabled="False" ToolTip="从头预览所选动作"/>
+ <ComboBox Name="Animations" MaxDropDownHeight="350" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+  <ComboBox.ItemContainerStyle><Style TargetType="ComboBoxItem">
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem">
+    <Border Name="Row" Padding="6,4"><StackPanel><ContentPresenter/><TextBlock Text="{TemplateBinding ToolTip}" FontSize="11" Foreground="#465D64"/></StackPanel></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Row" Property="Background" Value="#C8EBE1"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style></ComboBox.ItemContainerStyle>
+ </ComboBox></DockPanel>
+ <TextBlock Text="动画资源与播放方式" Margin="0,8,0,3"/>
+ <ComboBox Name="ClipName" IsEditable="True" MaxDropDownHeight="200"/>
+ <DockPanel Margin="0,4,0,0"><Button Name="ApplyAction" DockPanel.Dock="Right" Content="应用动作设置" Margin="6,0,0,0"/><ComboBox Name="Mode"/></DockPanel>
+ <TextBlock Name="Coverage" Foreground="#BCCBD0" TextWrapping="Wrap" Margin="0,5,0,0"/>
+ <DockPanel Margin="0,6,0,0"><Button Name="Play" Content="播放 / 暂停" DockPanel.Dock="Left"/><Slider Name="Frames" Margin="7,0" VerticalAlignment="Center" IsMoveToPointEnabled="True"/></DockPanel>
+ <DockPanel Margin="0,6,0,0"><Button Name="ApplyDuration" Content="应用帧数" DockPanel.Dock="Right"/><TextBlock Text="整段播放帧数" VerticalAlignment="Center"/><TextBox Name="Duration" Margin="7,0"/></DockPanel>
+ <Border Height="1" Background="#42545B" Margin="0,12,0,6"/>
+ <TextBlock Text="绘制模块 XML" FontWeight="SemiBold"/>
+ <TextBox Name="Xml" Height="145" Margin="0,5" FontFamily="Consolas" FontSize="12" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+ <Button Name="ApplyXml" Content="应用 XML 并预览" HorizontalAlignment="Left"/>
+ <DockPanel Margin="0,10,0,0"><Button Name="Generate" Content="确定并生成 XML" Background="#7BE1C6" Foreground="#142C27" DockPanel.Dock="Right" Margin="6,0,0,0"/>
+ <ComboBox Name="Scope" SelectedIndex="0"><ComboBoxItem Content="当前状态"/><ComboBoxItem Content="动作节点"/><ComboBoxItem Content="整个绘制模块"/></ComboBox></DockPanel>
+</StackPanel>

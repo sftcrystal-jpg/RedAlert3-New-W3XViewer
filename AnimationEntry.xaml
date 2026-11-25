@@ -1,0 +1,37 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Width="465" SizeToContent="Height" ResizeMode="NoResize"
+ WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#202C32" Foreground="#E5ECEE"
+ FontFamily="Segoe UI, Microsoft YaHei UI" FontSize="13">
+ <StackPanel Margin="18">
+  <TextBlock Name="Target" Foreground="#A9C8C1" TextWrapping="Wrap" Margin="0,0,0,10"/>
+  <StackPanel Name="StateFields">
+   <TextBlock Text="状态类型" Margin="0,0,0,4"/>
+   <ComboBox Name="Kind" Padding="4">
+    <ComboBoxItem Tag="PARSE_NORMAL" Content="条件状态 · 满足指定条件时播放"/>
+    <ComboBoxItem Tag="PARSE_DEFAULT" Content="默认状态 · 没有匹配条件时播放"/>
+    <ComboBoxItem Tag="PARSE_TRANSITION" Content="过渡状态 · 由状态切换脚本调用"/>
+   </ComboBox>
+   <StackPanel Name="ConditionFields" Margin="0,9,0,0">
+    <TextBlock Text="触发条件（多个条件用空格分隔）" Margin="0,0,0,4"/>
+    <TextBox Name="Conditions" AutomationProperties.Name="触发条件"/>
+    <DockPanel Margin="0,4,0,0"><Button Name="Append" DockPanel.Dock="Right" Content="加入条件" Padding="9,3" Margin="6,0,0,0"/>
+     <ComboBox Name="Catalog" IsEditable="True" MaxDropDownHeight="200" ToolTip="输入或选择 SDK 模型条件"/>
+    </DockPanel>
+   </StackPanel>
+   <TextBlock Name="StateNameLabel" Text="状态名称（选填）" Margin="0,9,0,4"/>
+   <TextBox Name="StateName" AutomationProperties.Name="状态名称"/>
+  </StackPanel>
+  <TextBlock Name="AssetLabel" Text="动画资源" Margin="0,9,0,4"/>
+  <DockPanel>
+   <Button Name="BrowseClip" DockPanel.Dock="Right" Content="选择 W3X…" Margin="6,0,0,0" Padding="10,4"/>
+   <ComboBox Name="Asset" IsEditable="True" MaxDropDownHeight="220" ToolTip="选择已加载的动画，或输入动画资源 ID"/>
+  </DockPanel>
+  <TextBlock Text="播放方式" Margin="0,9,0,4"/>
+  <ComboBox Name="PlaybackMode" Padding="4"/>
+  <TextBlock Name="Feedback" TextWrapping="Wrap" Foreground="#FFD18C" Margin="0,8,0,0" Visibility="Collapsed"/>
+  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+   <Button Content="取消" IsCancel="True" Margin="0,0,8,0"/>
+   <Button Name="Create" Content="添加并预览" IsDefault="True" Background="#7BE1C6" Foreground="#142C27"/>
+  </StackPanel>
+ </StackPanel>
+</Window>

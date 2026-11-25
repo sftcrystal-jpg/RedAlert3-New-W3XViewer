@@ -1,0 +1,145 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="W3X 场景查看器" Width="1190" Height="765"
+ MinWidth="850" MinHeight="605" WindowStartupLocation="CenterScreen" Background="#141D22"
+ FontFamily="Segoe UI, Microsoft YaHei UI" FontSize="13" Foreground="#E5ECEE" AllowDrop="True">
+ <Window.Resources>
+  <Style TargetType="Button">
+   <Setter Property="Background" Value="#34424A"/><Setter Property="Foreground" Value="#F0F4F5"/>
+   <Setter Property="Padding" Value="14,7"/><Setter Property="Cursor" Value="Hand"/><Setter Property="BorderThickness" Value="0"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+    <Border x:Name="Frame" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="Opacity" Value=".8"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value=".48"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="TextBox"><Setter Property="Background" Value="#151E23"/><Setter Property="Foreground" Value="#EDF3F4"/><Setter Property="CaretBrush" Value="White"/><Setter Property="BorderBrush" Value="#475960"/><Setter Property="Padding" Value="6,5"/></Style>
+  <Style TargetType="CheckBox"><Setter Property="Foreground" Value="#CBD7DA"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <Style x:Key="Section" TargetType="TextBlock"><Setter Property="FontSize" Value="15"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,0,0,12"/></Style>
+  <DataTemplate x:Key="BoneRowTemplate"><Grid Margin="3,2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" Margin="0,0,5,0" TextTrimming="CharacterEllipsis"/>
+   <TextBlock Grid.Column="1" Text="{Binding Coordinates}" FontSize="12" VerticalAlignment="Center" FontFamily="Consolas"/>
+  </Grid></DataTemplate>
+ </Window.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition/><RowDefinition Height="36"/></Grid.RowDefinitions>
+  <Border Background="#202B31" BorderBrush="#39474F" BorderThickness="0,0,0,1" Padding="18,0">
+   <DockPanel LastChildFill="False">
+    <Border Width="5" Height="23" VerticalAlignment="Center" Background="#7BE1C6" CornerRadius="2"/>
+    <TextBlock Name="WindowHeading" Text="W3X 场景查看器" FontSize="21" FontWeight="SemiBold" Margin="12,0" VerticalAlignment="Center"/>
+    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+     <CheckBox Name="GridToggle" Content="地面网格" IsChecked="True" VerticalAlignment="Center" Margin="0,0,18,0"/>
+     <Button Name="MotionEditorButton" Content="动画编辑器" Margin="0,0,8,0"/>
+     <Button Name="ConditionEditorButton" Content="条件动画" Margin="0,0,8,0"/>
+     <Button Name="FitButton" Content="总览场景" Margin="0,0,8,0"/>
+     <Button Name="OpenButton" Content="＋  添加 W3X" Background="#7BE1C6" Foreground="#142C27" FontWeight="SemiBold"/>
+    </StackPanel>
+   </DockPanel>
+  </Border>
+  <Grid Grid.Row="1">
+   <Grid.RowDefinitions><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Name="SidebarWidth" Width="310"/></Grid.ColumnDefinitions>
+   <Border Name="Surface" ClipToBounds="True" Background="#172126" Focusable="True">
+    <Grid>
+     <Grid Name="SceneLayer" Background="#172126" ClipToBounds="True">
+      <Viewport3D Name="Viewport" ClipToBounds="True"/>
+     </Grid>
+     <Grid Name="JointOverlay" ClipToBounds="True" IsHitTestVisible="False"/>
+     <StackPanel Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Background="#E5172126">
+      <TextBlock Text="将 W3X 拖入场景" HorizontalAlignment="Center" FontSize="23" FontWeight="SemiBold" Margin="14,9"/>
+      <TextBlock Text="可同时选择多个模型、骨架和动画文件" Foreground="#ABBBC1" HorizontalAlignment="Center" Margin="14,0,14,12"/>
+     </StackPanel>
+     <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Background="#EA202C32" CornerRadius="3" Padding="9,5" Margin="12" IsHitTestVisible="False">
+      <TextBlock Name="ViewHint" Foreground="#C2D1D4" FontSize="12" Text="左拖旋转  ·  右拖平移  ·  滚轮缩放  ·  Shift + 左拖移动模型"/>
+     </Border>
+    </Grid>
+   </Border>
+   <ContentControl Grid.Row="1" Name="EditorTimeline" Visibility="Collapsed" HorizontalContentAlignment="Stretch" Background="#202B31"/>
+   <Border Grid.Column="1" Grid.RowSpan="2" Background="#222E34" BorderBrush="#39474F" BorderThickness="1,0,0,0">
+    <ScrollViewer Name="SidebarScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+     <Grid Margin="16,18">
+     <ContentControl Name="EditorPanel" Visibility="Collapsed"/>
+     <StackPanel Name="ObjectPanel">
+      <DockPanel><TextBlock Text="场景对象" Style="{StaticResource Section}"/><TextBlock Name="Count" HorizontalAlignment="Right" Foreground="#9FB2B9" Text="0"/></DockPanel>
+      <ListBox Name="Objects" Height="163" Background="#182228" Foreground="#E0EBEC" BorderBrush="#405058" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="7,5"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+        <Border x:Name="Row" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+        <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="#31594F"/><Setter Property="Foreground" Value="White"/></Trigger></ControlTemplate.Triggers>
+       </ControlTemplate></Setter.Value></Setter></Style></ListBox.ItemContainerStyle>
+      </ListBox>
+      <StackPanel Name="Inspector" IsEnabled="False">
+       <TextBlock Name="Stats" Text="请选择场景对象" Foreground="#AEC0C5" Margin="0,7,0,0" FontSize="12"/>
+       <StackPanel Orientation="Horizontal" Margin="0,10,0,0"><Button Name="FocusButton" Content="聚焦对象"/><Button Name="EditBones" Content="编辑骨骼" Margin="6,0,0,0"/><Button Name="RemoveButton" Content="移除" Margin="6,0,0,0"/></StackPanel>
+       <Border Background="#3B4A52" Height="1" Margin="0,18,0,14"/>
+       <DockPanel Margin="0,0,0,8">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+         <Button Name="OpenMount" Content="附加" Padding="12,4" ToolTipService.ShowOnDisabled="True"/>
+         <Button Name="DetachMount" Content="解除附加" Padding="10,4" Margin="5,0,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+        <TextBlock Text="世界位置" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+       </DockPanel>
+       <TextBlock Name="MountInfo" Foreground="#8CE0C2" TextWrapping="Wrap" Margin="0,0,0,7" Visibility="Collapsed"/>
+       <UniformGrid Columns="3">
+        <StackPanel Margin="0,0,5,0"><TextBlock Text="X" Foreground="#F7A898"/><TextBox Name="PosX"/></StackPanel>
+        <StackPanel Margin="2,0,3,0"><TextBlock Text="Y" Foreground="#8CE0C2"/><TextBox Name="PosY"/></StackPanel>
+        <StackPanel Margin="5,0,0,0"><TextBlock Text="Z" Foreground="#9CBFEF"/><TextBox Name="PosZ"/></StackPanel>
+       </UniformGrid>
+       <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><CheckBox Name="BonesToggle" Content="显示骨架"/><CheckBox Name="BoxesToggle" Content="碰撞盒" Margin="15,0,0,0"/></StackPanel>
+       <Border Background="#3B4A52" Height="1" Margin="0,17,0,14"/>
+       <TextBlock Text="动画" Style="{StaticResource Section}"/>
+       <ComboBox Name="Motions" Padding="5" MaxDropDownHeight="260"/>
+       <DockPanel Margin="0,11,0,0"><Button Name="PlayButton" Content="播放"/><TextBlock Name="FrameInfo" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#B8CACE" FontSize="12"/></DockPanel>
+       <Slider Name="Timeline" Minimum="0" Maximum="1" IsMoveToPointEnabled="True" Margin="0,10,0,0"/>
+       <Grid Name="LengthControls" Margin="0,10,0,0">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock Text="播放帧数" VerticalAlignment="Center"/>
+        <TextBox Name="FrameCountInput" Grid.Column="1" Margin="8,0" VerticalContentAlignment="Center" AutomationProperties.Name="播完整个动作的帧数" ToolTip="输入正整数，按 Enter 应用"/>
+        <Button Name="ApplyFrameCount" Grid.Column="2" Content="应用" Padding="8,4"/>
+        <Button Name="ResetFrameCount" Grid.Column="3" Content="恢复原帧数" Padding="8,4" Margin="5,0,0,0"/>
+       </Grid>
+      </StackPanel>
+     </StackPanel>
+     <StackPanel Name="BonePanel" Visibility="Collapsed">
+      <DockPanel><Button Name="DoneBones" DockPanel.Dock="Right" Content="返回对象"/><TextBlock Text="编辑骨骼" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+      <TextBlock Name="RigCaption" Foreground="#AFC2C9" Margin="0,8,0,14" TextTrimming="CharacterEllipsis"/>
+      <DockPanel Margin="6,0,6,5"><TextBlock Text="骨骼名称"/><TextBlock Text="模型坐标 (X, Y, Z)" HorizontalAlignment="Right" Foreground="#AEC0C5"/></DockPanel>
+      <ListBox Name="BoneList" Height="204" Background="#182228" Foreground="#EDF3F4" BorderBrush="#405058" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" TextSearch.TextPath="Name" ItemTemplate="{StaticResource BoneRowTemplate}"/>
+      <TextBlock Name="JointName" Margin="0,14,0,4" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
+      <TextBlock Name="JointParent" Foreground="#ADC0C6" TextWrapping="Wrap"/>
+      <TextBox Name="JointCoordinates" IsReadOnly="True" IsReadOnlyCaretVisible="True" BorderThickness="0" Background="Transparent" Padding="0,4,0,0" Foreground="#ADC0C6" AutomationProperties.Name="所选骨骼的模型坐标"/>
+      <TextBlock Text="局部位置" Margin="0,12,0,4"/>
+      <UniformGrid Columns="3">
+       <StackPanel Margin="0,0,4,0"><TextBlock Text="X" Foreground="#F7A898"/><TextBox Name="BoneX" AutomationProperties.Name="骨骼位置 X"/></StackPanel>
+       <StackPanel Margin="2,0"><TextBlock Text="Y" Foreground="#8CE0C2"/><TextBox Name="BoneY" AutomationProperties.Name="骨骼位置 Y"/></StackPanel>
+       <StackPanel Margin="4,0,0,0"><TextBlock Text="Z" Foreground="#9CBFEF"/><TextBox Name="BoneZ" AutomationProperties.Name="骨骼位置 Z"/></StackPanel>
+      </UniformGrid>
+      <TextBlock Text="局部旋转（度，顺序 X → Y → Z）" Margin="0,12,0,4"/>
+      <UniformGrid Columns="3">
+       <StackPanel Margin="0,0,4,0"><TextBlock Text="X" Foreground="#F7A898"/><TextBox Name="BoneRX" AutomationProperties.Name="骨骼旋转 X"/></StackPanel>
+       <StackPanel Margin="2,0"><TextBlock Text="Y" Foreground="#8CE0C2"/><TextBox Name="BoneRY" AutomationProperties.Name="骨骼旋转 Y"/></StackPanel>
+       <StackPanel Margin="4,0,0,0"><TextBlock Text="Z" Foreground="#9CBFEF"/><TextBox Name="BoneRZ" AutomationProperties.Name="骨骼旋转 Z"/></StackPanel>
+      </UniformGrid>
+      <TextBlock Name="BoneError" Foreground="#F7A898" Visibility="Collapsed" Margin="0,5,0,0" Text="请输入有效数字。"/>
+      <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+       <Button Name="ResetBone" Content="还原此骨骼"/><Button Name="SaveRig" Content="另存 W3X…" Background="#7BE1C6" Foreground="#142C27" Margin="8,0,0,0"/>
+      </StackPanel>
+     </StackPanel>
+     <StackPanel Name="MountPanel" Visibility="Collapsed">
+      <DockPanel><Button Name="CancelMount" DockPanel.Dock="Right" Content="取消"/><TextBlock Text="附加到骨骼" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+      <TextBlock Name="MountSource" Foreground="#AEC0C5" TextWrapping="Wrap" Margin="0,9,0,16"/>
+      <DockPanel Margin="0,0,0,6"><Button Name="FocusMountTarget" Content="聚焦目标" DockPanel.Dock="Right" Padding="10,4"/><TextBlock Text="目标对象" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"/></DockPanel>
+      <ComboBox Name="MountTargets" Padding="6" MaxDropDownHeight="230"/>
+      <DockPanel Margin="4,15,4,6"><TextBlock Text="目标骨骼"/><TextBlock Text="世界坐标 (X, Y, Z)" HorizontalAlignment="Right" Foreground="#AEC0C5"/></DockPanel>
+      <ListBox Name="MountBones" Height="244" Background="#182228" Foreground="#EDF3F4" BorderBrush="#405058" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" TextSearch.TextPath="Name" ItemTemplate="{StaticResource BoneRowTemplate}"/>
+      <TextBlock Name="MountPoint" TextWrapping="Wrap" Foreground="#C1D3D8" Margin="0,10,0,12"/>
+      <CheckBox Name="MountRotation" Content="同时对齐并跟随骨骼朝向"/>
+      <Button Name="ConfirmMount" Content="确认附加" HorizontalAlignment="Left" Margin="0,16,0,0" Background="#7BE1C6" Foreground="#142C27"/>
+     </StackPanel>
+     </Grid>
+    </ScrollViewer>
+   </Border>
+  </Grid>
+  <Border Grid.Row="2" Background="#202B31" BorderBrush="#39474F" BorderThickness="0,1,0,0" Padding="14,0">
+   <DockPanel><Button Name="LogButton" Content="导入详情" DockPanel.Dock="Right" Padding="9,2" Margin="8,5,0,5"/>
+    <TextBlock Name="Status" VerticalAlignment="Center" Foreground="#BCCBD0" TextTrimming="CharacterEllipsis" Text="就绪"/></DockPanel>
+  </Border>
+ </Grid>
+</Window>

@@ -1,0 +1,25 @@
+<StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <WrapPanel><Button Name="OpenMotion" Content="打开动画 W3X" Background="#7BE1C6" Foreground="#142C27"/><Button Name="AddSkin" Content="载入骨架或模型" Margin="6,0,0,0"/></WrapPanel>
+ <TextBlock Text="动画" Margin="0,14,0,4"/><ComboBox Name="Clips" Padding="4"/>
+ <TextBlock Text="预览模型 / 骨架" Margin="0,8,0,4"/><ComboBox Name="Models" Padding="4"/>
+ <DockPanel Name="Transport" Margin="12,9" IsEnabled="False">
+  <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+   <Button Name="StepBack" Content="◀" AutomationProperties.Name="上一帧" ToolTip="上一帧" Padding="8,4"/>
+   <Button Name="Play" Content="播放" Margin="4,0" Padding="12,4"/>
+   <Button Name="StepNext" Content="▶" AutomationProperties.Name="下一帧" ToolTip="下一帧" Padding="8,4"/>
+  </StackPanel>
+  <TextBlock DockPanel.Dock="Right" Name="FrameLabel" Text="尚未载入动画" VerticalAlignment="Center" Margin="8,0,0,0"/>
+  <Slider Name="Frames" Minimum="1" Maximum="2" IsSnapToTickEnabled="True" TickFrequency="1" IsMoveToPointEnabled="True" VerticalAlignment="Center" Margin="10,0,2,0"/>
+ </DockPanel>
+ <StackPanel Name="Controls" IsEnabled="False">
+ <TextBlock Text="骨骼" Margin="0,6,0,4"/><ComboBox Name="Bones" Padding="4" MaxDropDownHeight="270"/>
+ <TextBlock Text="局部位置" Margin="0,9,0,2"/><UniformGrid Columns="3"><StackPanel Margin="0,0,4,0"><TextBlock Text="X" Foreground="#F7A898"/><TextBox Name="PosX"/></StackPanel><StackPanel Margin="0,0,4,0"><TextBlock Text="Y" Foreground="#8CE0C2"/><TextBox Name="PosY"/></StackPanel><StackPanel Margin="0,0,4,0"><TextBlock Text="Z" Foreground="#9CBFEF"/><TextBox Name="PosZ"/></StackPanel></UniformGrid>
+ <TextBlock Text="局部旋转（度）" Margin="0,8,0,2"/><UniformGrid Columns="3"><StackPanel Margin="0,0,4,0"><TextBlock Text="X" Foreground="#F7A898"/><TextBox Name="RotX"/></StackPanel><StackPanel Margin="0,0,4,0"><TextBlock Text="Y" Foreground="#8CE0C2"/><TextBox Name="RotY"/></StackPanel><StackPanel Margin="0,0,4,0"><TextBlock Text="Z" Foreground="#9CBFEF"/><TextBox Name="RotZ"/></StackPanel></UniformGrid>
+ <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><RadioButton Name="Translate" Content="移动轴" GroupName="tool" Foreground="White" IsChecked="True"/><RadioButton Name="Rotate" Content="旋转环" GroupName="tool" Foreground="White" Margin="15,0,0,0"/></StackPanel>
+ <Border Height="1" Background="#45545A" Margin="0,13,0,8"/>
+ <CheckBox Name="UseRange" Content="平滑影响一段帧"/>
+ <Grid Name="RangeInputs" IsEnabled="False" Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+ <TextBox Name="From" ToolTip="起始帧（含）"/><TextBlock Grid.Column="1" Text=" 至 " VerticalAlignment="Center"/><TextBox Grid.Column="2" Name="To" ToolTip="结束帧（含）"/>
+ </Grid>
+ <WrapPanel Margin="0,8,0,0"><Button Name="Undo" Content="撤销"/><Button Name="Save" Content="另存动画 W3X…" Margin="7,0,0,0" Background="#7BE1C6" Foreground="#142C27"/></WrapPanel>
+ </StackPanel></StackPanel>
