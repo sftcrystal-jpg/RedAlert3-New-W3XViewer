@@ -17,7 +17,7 @@ using Microsoft.Win32;
 
 namespace W3xScene
 {
-    class Viewer
+    partial class Viewer
     {
         public readonly Window Window;
         readonly Viewport3D viewport;
@@ -180,6 +180,7 @@ namespace W3xScene
         }
         async void Open()
         {
+            if(blenderPreview) return;
             var dlg=new OpenFileDialog{Filter="W3X 模型、骨架和动画 (*.w3x)|*.w3x",Multiselect=true,Title="添加到场景"};
             if(dlg.ShowDialog(Window)==true) await AddFiles(dlg.FileNames);
         }
@@ -520,6 +521,11 @@ namespace W3xScene
     {
         [STAThread] public static void Main(string[] args)
         {
+            if(args.Length==2 && (args[0]=="--blender-preview" || args[0]=="--blender-inline"))
+            {
+                Viewer.RunBlenderPreview(args[1],args[0]=="--blender-inline");
+                return;
+            }
             var app=new Application(); var viewer=new Viewer();
             if(args.Length>0) viewer.Window.ContentRendered+=async delegate {await viewer.AddFiles(args);};
             app.Run(viewer.Window);

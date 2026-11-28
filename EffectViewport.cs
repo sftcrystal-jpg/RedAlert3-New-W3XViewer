@@ -94,6 +94,16 @@ namespace W3xScene
             layer.Effect=null;
         }
         public void InvalidateScene(){discard=true;lastTime=-1;layer.Effect=null;}
+        // Publish a complete effect pass for this camera before rendering an offscreen PNG.
+        public void DrawSnapshot(List<SceneItem> items,double now)
+        {
+            if(rendering!=null)rendering.GetAwaiter().GetResult();
+            InvalidateScene();
+            Draw(items,now);
+            if(rendering==null)return;
+            rendering.GetAwaiter().GetResult();
+            Draw(items,now);
+        }
         public void Draw(List<SceneItem> items,double now)
         {
             bool active=items.Any(i=>i.HasEffects);

@@ -29,6 +29,8 @@ namespace W3xScene
         public int[] Indices;
         public Point[] UV;
         public string Texture;
+        public string ShaderName;
+        public Dictionary<string,string> TextureSlots;
         public EffectMaterial Effect;
         public FxPreview.DecodedImage Mask;
         public Point[] SecondUV;
@@ -138,7 +140,11 @@ namespace W3xScene
                 new[]{"DiffuseTexture","Texture_0","BaseTexture","DiffuseMap"}.Contains((string)c.Attribute("Name"), StringComparer.OrdinalIgnoreCase));
             mesh.Texture = texture == null ? null : texture.Value.Trim();
             mesh.Alpha = constants.Any(c=>(string)c.Attribute("Name")=="AlphaTestEnable" && (c.Value.Trim()=="1" || c.Value.Trim().Equals("true",StringComparison.OrdinalIgnoreCase)));
-            mesh.Effect=EffectMaterial.Read(Children(e,"FXShader").FirstOrDefault(),constants);
+            var shader=Children(e,"FXShader").FirstOrDefault();
+            mesh.ShaderName=shader==null ? null : (string)shader.Attribute("ShaderName");
+            mesh.TextureSlots=constants.Where(c=>c.Name.LocalName=="Texture" && c.Attribute("Name")!=null)
+                .GroupBy(c=>(string)c.Attribute("Name")).ToDictionary(g=>g.Key,g=>g.First().Value.Trim());
+            mesh.Effect=EffectMaterial.Read(shader,constants);
             if(mesh.Effect!=null)
             {
                 mesh.Texture=mesh.Effect.Texture0;
