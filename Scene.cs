@@ -64,6 +64,8 @@ namespace W3xScene
     {
         public readonly GeometryModel3D Model;
         public Mesh Source {get{return mesh;}}
+        public readonly string SubObjectId;
+        public bool? DrawVisible;
         public bool Deforms {get{return skinned;}}
         readonly Mesh mesh;
         readonly MeshGeometry3D geometry;
@@ -73,6 +75,7 @@ namespace W3xScene
         public RenderPart(Attachment attachment)
         {
             mesh=attachment.Mesh;
+            SubObjectId=attachment.SubObjectId ?? mesh.Id.Substring(mesh.Id.LastIndexOf('.')+1);
             parentBone=rigidBone=attachment.Bone;
             skinned=mesh.Weights.Length>0;
             if(mesh.Weights.Length==1 && mesh.Weights[0].All(w=>w.Bone==mesh.Weights[0][0].Bone && w.Weight>0))
@@ -87,7 +90,7 @@ namespace W3xScene
         public void Update(Matrix3D[] pose,bool[] visible)
         {
             int show=skinned ? parentBone : rigidBone;
-            bool hidden=mesh.Hidden || (show>=0 && show<visible.Length && !visible[show]);
+            bool hidden=!(DrawVisible ?? !mesh.Hidden) || (show>=0 && show<visible.Length && !visible[show]);
             Model.Geometry=hidden ? null : geometry;
             if(hidden) return;
             if(!skinned)
@@ -139,6 +142,7 @@ namespace W3xScene
         readonly List<RenderPart> parts=new List<RenderPart>();
         public IEnumerable<RenderPart> RenderParts {get{return parts;}}
         public readonly bool HasEffects;
+        public readonly List<ParticleSprite> Particles=new List<ParticleSprite>();
         readonly List<GeometryModel3D> boxes=new List<GeometryModel3D>();
         public IEnumerable<GeometryModel3D> VisibleGuides
         {
@@ -258,6 +262,7 @@ namespace W3xScene
             if(frame>=fromCount-1) return (toCount-1)+(frame-(fromCount-1));
             return frame*(toCount-1)/(fromCount-1);
         }
+        public int SourceFrame {get{return Motion==null ? 0 : (int)Math.Floor(MapFrame(Frame,PlaybackFrames,Motion.Frames));}}
         public void SetPlaybackFrames(int count)
         {
             if(count<1) throw new ArgumentOutOfRangeException("count");

@@ -159,7 +159,7 @@ namespace W3xScene
         internal Viewer OpenWorkspace(bool motion)
         {
             var editor=new Viewer();
-            editor.Window.Title=motion ? "W3X 动画编辑器" : "条件动画编辑器";
+            editor.Window.Title=motion ? "W3X 动画编辑器" : "Draw 段编辑器";
             editor.UI<TextBlock>("WindowHeading").Text=editor.Window.Title;
             foreach(var name in new[]{"MotionEditorButton","ConditionEditorButton","ObjectPanel","OpenButton","EmptyHint","LogButton"})
                 editor.UI<FrameworkElement>(name).Visibility=Visibility.Collapsed;

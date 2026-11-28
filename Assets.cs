@@ -67,7 +67,7 @@ namespace W3xScene
     }
     class Part
     {
-        public string AssetId;
+        public string AssetId,SubObjectId;
         public bool IsBox;
         public int Bone;
     }
@@ -151,7 +151,7 @@ namespace W3xScene
                 mesh.SortLevel=(int?)e.Attribute("SortLevel") ?? 0;
                 var second=Children(e,"TexCoords").Skip(1).FirstOrDefault();
                 if(second!=null)mesh.SecondUV=second.Elements().Select(t=>new Point(N(t,"X",0),1-N(t,"Y",0))).ToArray();
-                if(!mesh.Effect.Lightning)mesh.VertexColors=Values(e,"VertexColors").Select(c=>new System.Numerics.Vector4(
+                if(!mesh.Effect.Lightning || mesh.Effect.ClassicLightning)mesh.VertexColors=Values(e,"VertexColors").Select(c=>new System.Numerics.Vector4(
                     (float)N(c,"R",1),(float)N(c,"G",1),(float)N(c,"B",1),(float)N(c,"A",1))).ToArray();
             }
             return mesh;
@@ -222,7 +222,7 @@ namespace W3xScene
                         case "W3DContainer":
                             a=new Container { RigId=(string)e.Attribute("Hierarchy"), Parts=Children(e,"SubObject")
                                 .SelectMany(s=>Values(s,"RenderObject").Where(v=>v.Name.LocalName=="Mesh" || v.Name.LocalName=="CollisionBox")
-                                    .Select(v=>new Part {AssetId=v.Value.Trim(), IsBox=v.Name.LocalName=="CollisionBox", Bone=(int?)s.Attribute("BoneIndex") ?? 0})).ToArray() };
+                                    .Select(v=>new Part {AssetId=v.Value.Trim(),SubObjectId=(string)s.Attribute("SubObjectID"),IsBox=v.Name.LocalName=="CollisionBox",Bone=(int?)s.Attribute("BoneIndex") ?? 0})).ToArray() };
                             break;
                         case "Texture": a=new TextureFile {FileName=(string)e.Attribute("File")}; break;
                         case "Includes": file.Includes.AddRange(Children(e,"Include").Select(i=>(string)i.Attribute("source")).Where(s=>!string.IsNullOrWhiteSpace(s))); break;

@@ -8,7 +8,10 @@
   </Style>
  </StackPanel.Resources>
  <WrapPanel><Button Name="OpenConfig" Content="打开单位 XML"/><Button Name="Assets" Content="补充 W3X" Margin="6,0,0,0"/></WrapPanel>
- <TextBlock Text="绘制模块 · 勾选显示，点名称编辑" Margin="0,10,0,3"/>
+ <DockPanel Margin="0,10,0,3">
+  <Button Name="AttachDraw" Content="＋ 挂接 W3X" DockPanel.Dock="Right" IsEnabled="False" Padding="8,3" ToolTip="在所选 Draw 的骨骼上挂接新的 ScriptedModelDraw"/>
+  <TextBlock Text="绘制模块 · 勾选显示，点名称编辑" VerticalAlignment="Center"/>
+ </DockPanel>
  <ListBox Name="Modules" MaxHeight="158" Background="#182228" Foreground="#E0EBEC" BorderBrush="#405058" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" ItemContainerStyle="{StaticResource DrawEditorRow}">
  </ListBox>
  <TextBlock Text="预览条件（空格分隔）" Margin="0,10,0,3"/>
@@ -16,8 +19,25 @@
  <DockPanel Margin="0,4,0,0"><Button Name="AppendFlag" Content="加入条件" DockPanel.Dock="Right" Margin="6,0,0,0"/><ComboBox Name="FlagsCatalog" IsEditable="True" MaxDropDownHeight="220"/></DockPanel>
  <TextBlock Name="ModelMatch" Foreground="#8CE0C2" TextWrapping="Wrap" Margin="0,8,0,0"/>
  <DockPanel Margin="0,8,0,4">
+  <Button Name="NewModelState" Content="＋ 新增模型状态" DockPanel.Dock="Right" IsEnabled="False" Padding="8,3"/>
+  <TextBlock Text="模型条件状态" VerticalAlignment="Center"/>
+ </DockPanel>
+ <DockPanel>
+  <Button Name="ModelFx" Content="挂特效" DockPanel.Dock="Right" IsEnabled="False" Padding="8,3" Margin="6,0,0,0" ToolTip="给所选 ModelConditionState 添加骨骼特效"/>
+  <ComboBox Name="ModelStates" MaxDropDownHeight="260" ToolTip="选择要编辑和预览的模型状态，点「匹配」可返回按条件预览"/>
+ </DockPanel>
+ <DockPanel Margin="0,8,0,3">
+  <Button Name="ChooseFx" DockPanel.Dock="Right" Content="选择预览器…" Padding="7,3" ToolTip="选择含 viewer.html 的 FXPreview.exe，重新连接特效资源"/>
+  <CheckBox Name="ShowFx" Content="显示挂载特效" IsChecked="True" VerticalAlignment="Center"/>
+ </DockPanel>
+ <DockPanel><Button Name="OpenFx" DockPanel.Dock="Right" Content="单看特效" Padding="7,3" Margin="6,0,0,0" IsEnabled="False"/>
+  <ComboBox Name="FxBindings" MaxDropDownHeight="220" AutomationProperties.Name="当前 Draw 的骨骼特效"/>
+ </DockPanel>
+ <TextBlock Name="FxStatus" Foreground="#BCCBD0" TextWrapping="Wrap" Margin="0,3,0,0"/>
+ <DockPanel Margin="0,8,0,4">
   <Button Name="NewState" DockPanel.Dock="Right" Content="＋ 新增动画状态" Padding="9,3" Background="#7BE1C6" Foreground="#142C27" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="先选择支持动画状态的 Draw"/>
-  <TextBlock Name="StatesLabel" Text="动画状态 · 从上往下匹配" VerticalAlignment="Center"/>
+  <Button Name="AnimationFx" Content="挂特效" DockPanel.Dock="Right" IsEnabled="False" Padding="8,3" Margin="0,0,5,0" ToolTip="给所选 AnimationState 添加骨骼特效"/>
+  <TextBlock Name="StatesLabel" Text="动画状态" VerticalAlignment="Center"/>
  </DockPanel>
  <DockPanel>
   <StackPanel DockPanel.Dock="Right" Margin="6,0,0,0">
@@ -51,5 +71,5 @@
  <TextBox Name="Xml" Height="145" Margin="0,5" FontFamily="Consolas" FontSize="12" AcceptsReturn="True" AcceptsTab="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
  <Button Name="ApplyXml" Content="应用 XML 并预览" HorizontalAlignment="Left"/>
  <DockPanel Margin="0,10,0,0"><Button Name="Generate" Content="确定并生成 XML" Background="#7BE1C6" Foreground="#142C27" DockPanel.Dock="Right" Margin="6,0,0,0"/>
- <ComboBox Name="Scope" SelectedIndex="0"><ComboBoxItem Content="当前状态"/><ComboBoxItem Content="动作节点"/><ComboBoxItem Content="整个绘制模块"/></ComboBox></DockPanel>
+ <ComboBox Name="Scope" SelectedIndex="0"><ComboBoxItem Content="动画状态"/><ComboBoxItem Content="动作节点"/><ComboBoxItem Content="整个绘制模块"/><ComboBoxItem Content="整组 Draws"/><ComboBoxItem Content="模型条件状态"/></ComboBox></DockPanel>
 </StackPanel>

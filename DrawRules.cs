@@ -65,6 +65,27 @@ namespace W3xScene
                 if(m.Groups[1].Value==previous) return m.Groups[2].Value;
             return null;
         }
+        static readonly Regex visibilityCall=new Regex(@"^CurDrawable(Hide|Show)SubObjectPermanently\s*\(\s*(['""])([^'""\\]+)\2\s*\)\s*;?$");
+        public static void ApplyVisibility(XElement state,SceneItem actor)
+        {
+            var script=state==null ? null : Children(state,"Script").FirstOrDefault();
+            if(script==null)return;
+            // Only consume leading, unconditional literal calls. Leave Lua branches,
+            // expressions and block comments to the game.
+            using(var reader=new StringReader(script.Value))
+            {
+                string line;
+                while((line=reader.ReadLine())!=null)
+                {
+                    line=line.Trim();
+                    if(line.Length==0 || line.StartsWith("--") && !line.StartsWith("--["))continue;
+                    var call=visibilityCall.Match(line);if(!call.Success)break;
+                    foreach(var part in actor.RenderParts)
+                        if(Import.Names.Equals(part.SubObjectId,call.Groups[3].Value))
+                            part.DrawVisible=call.Groups[1].Value=="Show";
+                }
+            }
+        }
         static IEnumerable<XElement> TypeHierarchy(string type)
         {
             XElement decl;
@@ -80,11 +101,13 @@ namespace W3xScene
             return IsModule(module) && TypeHierarchy(moduleTypes[module.Name.LocalName])
                 .Any(t=>(string)t.Attribute("name")=="W3DScriptedModelDrawModuleData");
         }
-        public static void InsertAnimationEntry(XElement parent,XElement entry)
+        public static void InsertEntry(XElement parent,XElement entry)
         {
-            // The SDK sequence puts states after model conditions and actions before scripts and events.
-            bool state=entry.Name.LocalName=="AnimationState";
-            var last=parent.Elements().TakeWhile(e=>e.Name==entry.Name || (state && e.Name==parent.Name.Namespace+"ModelConditionState")).LastOrDefault();
+            string type=IsModule(parent) ? "W3DScriptedModelDrawModuleData" : parent.Name.LocalName;
+            var order=types[type].Descendants().Where(e=>e.Name.LocalName=="element").Select(e=>(string)e.Attribute("name")).ToList();
+            int rank=order.IndexOf(entry.Name.LocalName);
+            if(rank<0)throw new InvalidDataException(parent.Name.LocalName+" 不支持 "+entry.Name.LocalName);
+            var last=parent.Elements().TakeWhile(e=>order.IndexOf(e.Name.LocalName)>=0 && order.IndexOf(e.Name.LocalName)<=rank).LastOrDefault();
             var whitespace=(last==null ? parent.FirstNode : last.PreviousNode) as XText;
             string indent=whitespace!=null && string.IsNullOrWhiteSpace(whitespace.Value) ? whitespace.Value : null;
             if(last==null)parent.AddFirst(indent,entry);

@@ -28,7 +28,7 @@
     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
      <CheckBox Name="GridToggle" Content="地面网格" IsChecked="True" VerticalAlignment="Center" Margin="0,0,18,0"/>
      <Button Name="MotionEditorButton" Content="动画编辑器" Margin="0,0,8,0"/>
-     <Button Name="ConditionEditorButton" Content="条件动画" Margin="0,0,8,0"/>
+     <Button Name="ConditionEditorButton" Content="Draw 段编辑器" Margin="0,0,8,0"/>
      <Button Name="FitButton" Content="总览场景" Margin="0,0,8,0"/>
      <Button Name="OpenButton" Content="＋  添加 W3X" Background="#7BE1C6" Foreground="#142C27" FontWeight="SemiBold"/>
     </StackPanel>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -40,6 +41,8 @@ namespace W3xScene
         }
 
         string Decode(byte[] bytes){return encoding.GetString(bytes,preamble,bytes.Length-preamble);}
+        public static int[] ElementPath(XElement e)
+        {return e.AncestorsAndSelf().Where(n=>n.Parent!=null).Reverse().Select(n=>n.ElementsBeforeSelf().Count()).ToArray();}
 
         static XElement ElementAtPath(string text,int[] path,LoadOptions options)
         {
@@ -73,12 +76,8 @@ namespace W3xScene
             throw new InvalidDataException("无法定位原文件中的 Draw 结束标签。");
         }
 
-        byte[] ReplaceModule(int[] elementPath,XElement module)
+        static int ElementEnd(string text,XElement target,int start)
         {
-            string text=Decode(saved);
-            var target=ElementAtPath(text,elementPath,LoadOptions.PreserveWhitespace|LoadOptions.SetLineInfo);
-            int start=LineOffset(text,target)-1;
-            if(!DrawRules.IsModule(target) || start<0 || text[start]!='<')throw new InvalidDataException("无法定位原文件中的 Draw。");
             int last=start;
             if(!target.IsEmpty)
             {
@@ -88,7 +87,25 @@ namespace W3xScene
                     last=LineOffset(text,(IXmlLineInfo)reader);
                 }
             }
-            int end=TagEnd(text,last);
+            return TagEnd(text,last);
+        }
+        byte[] WriteModule(byte[] bytes,int[] path,XElement module,bool append,out int[] resultingPath)
+        {
+            string text=Decode(bytes);
+            var target=ElementAtPath(text,path,LoadOptions.PreserveWhitespace|LoadOptions.SetLineInfo);
+            resultingPath=path;
+            if(append)
+            {
+                if(target.Name.LocalName!="Draws")throw new InvalidDataException("新增 Draw 必须写入单位的 Draws 节点。");
+                if(target.Elements().Any(e=>Import.Names.Equals(DrawRules.A(e,"id"),DrawRules.A(module,"id"))))
+                    throw new InvalidDataException("同组已有同名 Draw："+DrawRules.A(module,"id"));
+                resultingPath=path.Concat(new[]{target.Elements().Count()}).ToArray();
+                target=target.Elements().Last();
+            }
+            else if(!DrawRules.IsModule(target))throw new InvalidDataException("无法定位原文件中的 Draw。");
+            int start=LineOffset(text,target)-1;
+            if(start<0 || text[start]!='<')throw new InvalidDataException("无法定位原文件中的 XML 节点。");
+            int end=ElementEnd(text,target,start);
             int firstBreak=text.IndexOfAny(new[]{'\r','\n'});
             string newline=firstBreak<0 ? Environment.NewLine : text[firstBreak]=='\n' ? "\n" :
                 firstBreak+1<text.Length && text[firstBreak+1]=='\n' ? "\r\n" : "\r";
@@ -100,20 +117,38 @@ namespace W3xScene
                 // Keep the exact bytes outside the Draw, including the original file's BOM and declaration.
                 int prefix=preamble+encoding.GetByteCount(text.Substring(0,start));
                 int suffix=prefix+encoding.GetByteCount(text.Substring(start,end-start));
-                output.Write(saved,0,prefix);
+                output.Write(bytes,0,append ? suffix : prefix);
+                if(append)
+                {
+                    int lineStart=text.LastIndexOfAny(new[]{'\r','\n'},start)+1;
+                    string indent=text.Substring(lineStart,start-lineStart);
+                    byte[] spacing=encoding.GetBytes(newline+(string.IsNullOrWhiteSpace(indent)?indent:""));
+                    output.Write(spacing,0,spacing.Length);
+                }
                 fragment.Position=encoding.GetPreamble().Length;
                 fragment.CopyTo(output);
-                output.Write(saved,suffix,saved.Length-suffix);
+                output.Write(bytes,suffix,bytes.Length-suffix);
                 return output.ToArray();
             }
         }
 
-        public void Save(int[] elementPath,XElement module)
+        public void Save(DrawPreview[] changes)
         {
-            var updated=ReplaceModule(elementPath,module);
-            var result=ElementAtPath(Decode(updated),elementPath,LoadOptions.None);
-            if(!DrawRules.IsModule(result) || result.Name.LocalName!=module.Name.LocalName || DrawRules.A(result,"id")!=DrawRules.A(module,"id"))
-                throw new InvalidDataException("写回结果与所选 Draw 不一致。");
+            if(changes.Length==0)return;
+            var updated=saved;
+            var paths=new Dictionary<DrawPreview,int[]>();
+            foreach(var draw in changes)
+            {
+                if(draw.SourceFile!=this || draw.Draft!=draw.Applied)throw new InvalidDataException("请先应用同组待写回 Draw 的 XML 草稿。");
+                DrawRules.Validate(draw.Module);
+                int[] path;
+                bool append=draw.SourceElementPath==null;
+                updated=WriteModule(updated,append?ElementPath(draw.Group):draw.SourceElementPath,draw.Module,append,out path);
+                var result=ElementAtPath(Decode(updated),path,LoadOptions.None);
+                if(!DrawRules.IsModule(result) || result.Name.LocalName!=draw.Module.Name.LocalName || DrawRules.A(result,"id")!=DrawRules.A(draw.Module,"id"))
+                    throw new InvalidDataException("写回结果与所选 Draw 不一致。");
+                paths.Add(draw,path);
+            }
             string temp=Path.Combine(Path.GetDirectoryName(FilePath),Guid.NewGuid().ToString("N")+".tmp");
             try
             {
@@ -128,6 +163,7 @@ namespace W3xScene
                         throw new IOException("原文件已被其他程序修改。请先复制当前修改，重新打开原文件后再应用。");
                     File.Replace(temp,FilePath,BackupPath);
                     saved=updated;
+                    foreach(var entry in paths){entry.Key.SourceElementPath=entry.Value;entry.Key.Saved=entry.Key.Applied;}
                 }
             }
             finally{if(File.Exists(temp))File.Delete(temp);}

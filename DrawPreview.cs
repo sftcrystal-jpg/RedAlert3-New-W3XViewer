@@ -9,27 +9,33 @@ namespace W3xScene
     // Each ScriptedModelDraw owns its XML selection, pose and clock, even when another row is selected.
     class DrawPreview
     {
-        public XElement Module, ModelRule, State, Action;
+        public XElement Module, ModelRule, PinnedModelRule, State, Action;
+        public readonly XElement ImportedNode;
         public readonly XElement Group;
         public readonly string Original;
         public readonly DrawXmlFile SourceFile;
-        public readonly int[] SourceElementPath;
+        public int[] SourceElementPath;
         public string Saved;
         public string Applied, Draft, ModelName, MountNote;
         public bool Visible=true, Manual;
+        public DrawFx Effects;
         public List<SceneItem> Items=new List<SceneItem>();
         public SceneItem Actor {get{return Items.Count==0 ? null : Items[0];}}
         public XElement PlayingAction {get;private set;}
         public bool InTransition {get;private set;}
+        public int PlaybackVersion {get;private set;}
+        public bool PausedByUser {get;private set;}
         string mode;
+        XElement visibilityModule;
         double elapsed,seconds;
 
-        public DrawPreview(XElement module,DrawXmlFile sourceFile)
+        public DrawPreview(XElement module,DrawXmlFile sourceFile,DrawPreview parent=null)
         {
-            Module=module;Group=module.Parent ?? module;SourceFile=sourceFile;
+            Module=module;Group=parent!=null ? parent.Group : module.Parent ?? module;SourceFile=sourceFile;
+            ImportedNode=parent==null ? module : null;
             Draft=Applied=module.ToString();
-            Original=Saved=sourceFile==null ? "" : Applied;
-            SourceElementPath=module.AncestorsAndSelf().Where(e=>e.Parent!=null).Reverse().Select(e=>e.ElementsBeforeSelf().Count()).ToArray();
+            Original=Saved=sourceFile==null || parent!=null ? "" : Applied;
+            SourceElementPath=parent==null ? DrawXmlFile.ElementPath(module) : null;
         }
         public Clip FindClip(XElement action,IEnumerable<Clip> clips)
         {
@@ -56,9 +62,17 @@ namespace W3xScene
         }
         public void Start(XElement action,IEnumerable<Clip> clips,bool transition=false)
         {
+            PlaybackVersion++;PausedByUser=false;
             InTransition=transition;PlayingAction=action;elapsed=0;
             mode=DrawRules.A(action,"AnimationMode","LOOP");
             if(Actor==null)return;
+            if(Module!=visibilityModule)
+            {
+                foreach(var part in Actor.RenderParts)part.DrawVisible=null;
+                visibilityModule=Module;
+            }
+            DrawRules.ApplyVisibility(State,Actor);
+            if(transition && action!=null && action.Parent!=State)DrawRules.ApplyVisibility(action.Parent,Actor);
             var clip=FindClip(action,clips);Actor.SetMotion(clip);
             if(clip==null)return;
             seconds=Seconds(action,clip);
@@ -73,10 +87,12 @@ namespace W3xScene
             if(Actor==null || Actor.Motion==null)return;
             if(!Actor.Playing && mode.StartsWith("ONCE") && elapsed>=seconds) elapsed=0;
             Actor.Playing=!Actor.Playing;
+            PausedByUser=!Actor.Playing;
         }
         public void Seek(double frame)
         {
             if(Actor==null || Actor.Motion==null)return;
+            PlaybackVersion++;PausedByUser=true;
             Actor.Playing=false;Actor.Frame=Math.Round(frame);Actor.Apply();
             int count=Actor.PlaybackFrames;
             elapsed=(mode.EndsWith("BACKWARDS") ? count-1-Actor.Frame : Actor.Frame)/count*seconds;

@@ -13,6 +13,7 @@ namespace W3xScene
     class Attachment
     {
         public Mesh Mesh;
+        public string SubObjectId;
         public int Bone;
     }
     class ModelSpec
@@ -301,7 +302,7 @@ namespace W3xScene
                         if(mesh==null) { Warnings.Add(c.Id+"  ·  缺少网格 "+part.AssetId); continue; }
                         MaterialFor(mesh);
                         used.Add(mesh);
-                        model.Parts.Add(new Attachment{Mesh=mesh,Bone=part.Bone});
+                        model.Parts.Add(new Attachment{Mesh=mesh,Bone=part.Bone,SubObjectId=part.SubObjectId});
                     }
                     if(!model.RigOnly || model.Rig!=null) Models.Add(model);
                 }

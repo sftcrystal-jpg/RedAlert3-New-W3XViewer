@@ -14,6 +14,13 @@ using System.Windows.Media.Media3D;
 
 namespace W3xScene
 {
+    struct ParticleSprite
+    {
+        public SpriteMaterial Material;
+        public Point3D Center;
+        public float Size,Angle;
+        public Vector4 Color,UV;
+    }
     sealed class EffectComposite : ShaderEffect
     {
         static readonly DependencyProperty Input=RegisterPixelShaderSamplerProperty("Input",typeof(EffectComposite),0);
@@ -50,6 +57,7 @@ namespace W3xScene
         struct DrawCall
         {
             public Mesh Mesh;
+            public ParticleSprite Sprite;
             public Point3DCollection SkinnedPositions;
             public Vector3DCollection SkinnedNormals;
             public Matrix3D World;
@@ -106,7 +114,7 @@ namespace W3xScene
         }
         public void Draw(List<SceneItem> items,double now)
         {
-            bool active=items.Any(i=>i.HasEffects);
+            bool active=items.Any(i=>i.HasEffects || i.Particles.Count>0);
             if(!active && layer.Effect!=null)InvalidateScene();
             if(rendering!=null)
             {
@@ -146,6 +154,8 @@ namespace W3xScene
             foreach(var item in items)
             {
                 var placement=item.Group.Transform.Value;
+                foreach(var sprite in item.Particles)
+                    transparent.Add(new DrawCall{Mesh=sprite.Material,Sprite=sprite,Distance=Vector3D.DotProduct(sprite.Center-eye,forward)});
                 foreach(var guide in item.VisibleGuides)AddGuide(guide,placement);
                 foreach(var p in item.RenderParts)
                 {
@@ -179,7 +189,9 @@ namespace W3xScene
             Array.Clear(depth,0,depth.Length);Array.Clear(lightBuffer,0,lightBuffer.Length);
             for(int i=0;i<transmissionBuffer.Length;i++)transmissionBuffer[i]=0xFFFFFF;
             faces.Clear();foreach(var band in bands)band.Clear();
-            foreach(var call in calls)DrawMesh(call,time);
+            foreach(var call in calls)
+                if(call.Sprite.Material!=null)DrawSprite(call.Sprite);
+                else DrawMesh(call,time);
             Parallel.For(0,bands.Length,new ParallelOptions{MaxDegreeOfParallelism=4},i=>{
                 int y0=i*BandHeight,y1=Math.Min(height,y0+BandHeight);
                 foreach(int f in bands[i])
@@ -212,6 +224,27 @@ namespace W3xScene
                 if(insB)output[n++]=b;a=b;
             }
             return n;
+        }
+        void DrawSprite(ParticleSprite s)
+        {
+            var axisX=s.Material.Ground ? new Vector3D(1,0,0) : right;
+            var axisY=s.Material.Ground ? new Vector3D(0,1,0) : up;
+            double cos=Math.Cos(s.Angle)*s.Size*.5,sin=Math.Sin(s.Angle)*s.Size*.5;
+            var x=axisX*cos+axisY*sin;var y=axisY*cos-axisX*sin;
+            for(int i=0;i<4;i++)
+            {
+                bool r=i==1 || i==2, t=i>=2;
+                var d=(s.Center-eye)+(r?x:-x)+(t?y:-y);
+                cutA[i]=new Vertex{X=(float)Vector3D.DotProduct(d,right),Y=(float)Vector3D.DotProduct(d,up),
+                    Z=(float)Vector3D.DotProduct(d,forward),Tint=s.Color,UV=new Vector4(r?s.UV.Z:s.UV.X,t?s.UV.W:s.UV.Y,0,0)};
+            }
+            int count=Clip(cutA,4,cutB,near,true);if(count<3)return;
+            count=Clip(cutB,count,cutA,far,false);if(count<3)return;
+            var first=Project(cutA[0]);var prev=Project(cutA[1]);
+            for(int i=2;i<count;i++)
+            {
+                var next=Project(cutA[i]);QueueFace(first,prev,next,s.Material);prev=next;
+            }
         }
         void DrawMesh(DrawCall call,float time)
         {
@@ -274,6 +307,7 @@ namespace W3xScene
             float area=(b.X-a.X)*(c.Y-a.Y)-(b.Y-a.Y)*(c.X-a.X);
             if(Math.Abs(area)<1e-6f)return;
             var fx=mesh.Effect;
+            bool sprite=mesh is SpriteMaterial;
             if(fx!=null && fx.Cull && area>0)return;
             if(area<0){var swap=b;b=c;c=swap;area=-area;}
             int x0=(int)Math.Max(0,Math.Min(width,Math.Floor(Math.Min(a.X,Math.Min(b.X,c.X)))));
@@ -299,6 +333,14 @@ namespace W3xScene
                     {
                         if(EffectMaterial.Sample(mesh.Mask,uv.X,uv.Y).W>=.5f)depth[index]=z;
                         continue;
+                    }
+                    if(sprite)
+                    {
+                        var color=EffectMaterial.Sample(fx.First,uv.X,uv.Y)*((a.Tint*p+b.Tint*q+c.Tint*r)*inv);
+                        if(fx.AlphaTest && color.W<.4f)continue;
+                        if(fx.Blend==SurfaceBlend.Multiply)color=Vector4.One-new Vector4(color.X,color.Y,color.Z,0);
+                        if(fx.AlphaTest && fx.Blend==SurfaceBlend.Alpha)color.W=1;
+                        Composite(index,color,fx.Blend);continue;
                     }
                     var noise=fx.UsesSecond?(a.Noise*p+b.Noise*q+c.Noise*r)*inv:Vector4.Zero;
                     var pixel=fx.Shade(uv,noise,(a.Fade*p+b.Fade*q+c.Fade*r)*inv,(a.Light*p+b.Light*q+c.Light*r)*inv,

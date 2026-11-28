@@ -13,7 +13,7 @@ namespace W3xScene
 
     sealed class EffectMaterial
     {
-        public bool Lightning, Multi, WorldUV, UniqueWorld, Cull, DepthWrite, AlphaTest;
+        public bool Lightning, ClassicLightning, Multi, WorldUV, UniqueWorld, Cull, DepthWrite, AlphaTest;
         public int TextureCount, SecondaryMode, PrimaryMapper, SecondaryMapper;
         public float Opacity, Edge, HDR, NoiseScale, NoiseAmplitude, NoiseSpeed, NoiseCos, NoiseSin, WorldScale;
         public Vector4 Color, Ambient, Emission, Specular, PrimaryUV, SecondaryUV, Animation;
@@ -28,23 +28,28 @@ namespace W3xScene
         {
             if(shader==null)return null;
             string name=Path.GetFileNameWithoutExtension((string)shader.Attribute("ShaderName") ?? "").ToLowerInvariant();
-            if(name!="fxlightning" && name!="defaultw3d" && name!="defaultw3dnofognocloud")return null;
+            bool lightning=name=="lightning" || name=="fxlightning";
+            if(!lightning && name!="defaultw3d" && name!="defaultw3dnofognocloud")return null;
             var args=new Parameters(constants);
-            var m=new EffectMaterial{Lightning=name=="fxlightning"};
+            var m=new EffectMaterial{Lightning=lightning,ClassicLightning=name=="lightning"};
             m.Texture0=args.Text("Texture_0");m.Texture1=args.Text("Texture_1");
             m.TextureCount=(int)args.Number("NumTextures",string.IsNullOrEmpty(m.Texture0)?0:1);
             m.Multi=args.Flag("MultiTextureEnable",false);
             int blend=(int)args.Number("BlendMode",0);
             m.Blend=m.Lightning ? (args.Flag("MultiplyBlendEnable",false)?SurfaceBlend.Multiply:SurfaceBlend.Add) :
                 blend==2 ? SurfaceBlend.Add : blend==1 ? SurfaceBlend.Alpha : SurfaceBlend.Opaque;
-            m.Cull=args.Flag("CullingEnable",!m.Lightning);
+            m.Cull=args.Flag("CullingEnable",m.ClassicLightning || !m.Lightning);
             m.DepthWrite=args.Flag("DepthWriteEnable",m.Blend==SurfaceBlend.Opaque);
             m.AlphaTest=args.Flag("AlphaTestEnable",false);
             m.Color=args.Vector("ColorDiffuse",Vector4.One);
+            // In Lightning.fx the additive pass takes its tint from COLOR0. Its
+            // ColorDiffuse constant is only used by the multiply technique.
+            if(m.ClassicLightning)m.Color=m.Blend==SurfaceBlend.Add ? Vector4.One :
+                new Vector4(1-m.Color.X,1-m.Color.Y,1-m.Color.Z,1);
             m.Ambient=args.Vector("ColorAmbient",m.Color);
             m.Emission=args.Vector("ColorEmissive",Vector4.Zero);
             m.Specular=args.Vector("ColorSpecular",Vector4.Zero);m.Shininess=Math.Max(1,args.Number("Shininess",1));
-            m.HDR=args.Number("EmissiveHDRMultipler",1);
+            m.HDR=args.Number(m.ClassicLightning?"HDRMultiplier":"EmissiveHDRMultipler",1);
             m.Opacity=args.Number("Opacity",1);m.Edge=args.Number("EdgeFadeOut",0);
             m.PrimaryMapper=(int)args.Number("TexCoordMapper_0",0);m.SecondaryMapper=(int)args.Number("TexCoordMapper_1",0);
             m.PrimaryUV=m.Lightning ? args.Vector("DiffuseCoordOffset",new Vector4(0,0,1,1)) :
@@ -56,7 +61,7 @@ namespace W3xScene
             m.UniqueWorld=args.Flag("UniqueWorldCoordEnable",false);m.WorldScale=args.Number("UniqueWorldCoordScalar",1);
             m.NoiseScale=args.Number("DisplaceScalar",1);m.NoiseAmplitude=args.Number("DisplaceAmp",0);
             m.NoiseSpeed=args.Number("DisplaceSpeed",0);
-            double angle=args.Number("DisplaceDivergenceAngle",0)*Math.PI/360.0;
+            double angle=args.Number("DisplaceDivergenceAngle",0)*Math.PI/(m.ClassicLightning?180.0:360.0);
             m.NoiseCos=(float)Math.Cos(angle);m.NoiseSin=(float)Math.Sin(angle);
             return m;
         }
@@ -117,10 +122,12 @@ namespace W3xScene
             noise=Vector4.Zero;
             if(Lightning)
             {
-                float du=Frac(time*.25f*PrimaryUV.X),dv=Frac(time*.25f*PrimaryUV.Y);
-                uv=new Vector4(u*PrimaryUV.Z+du,v*PrimaryUV.W+dv,u*PrimaryUV.Z-du,v*PrimaryUV.W-dv);
+                float scroll=ClassicLightning?time:time*.25f;
+                float du=Frac(scroll*PrimaryUV.X),dv=Frac(scroll*PrimaryUV.Y);
+                float u2=u*PrimaryUV.Z,v2=v*PrimaryUV.W;
+                uv=new Vector4((ClassicLightning?u:u2)+du,(ClassicLightning?v:v2)+dv,u2-du,v2-dv);
                 float x=u*NoiseScale,y=v*NoiseScale+(UniqueWorld?(wx+wy)*WorldScale*.1f:0);
-                float t=time*.0025f*NoiseSpeed;
+                float t=scroll*.01f*NoiseSpeed;
                 noise=new Vector4(x*NoiseCos+y*NoiseSin+t,y*NoiseCos-x*NoiseSin,x*NoiseCos-y*NoiseSin+t,y*NoiseCos+x*NoiseSin);
                 return;
             }

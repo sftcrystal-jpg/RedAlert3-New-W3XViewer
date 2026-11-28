@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,7 @@ using Forms=System.Windows.Forms;
 
 namespace W3xScene
 {
-    class ConditionWorkspace : EditWorkspace
+    partial class ConditionWorkspace : EditWorkspace
     {
         readonly List<ModelSpec> library=new List<ModelSpec>();
         readonly List<Clip> clips=new List<Clip>();
@@ -25,12 +26,23 @@ namespace W3xScene
         HashSet<string> active=new HashSet<string>();
         DrawPreview current;
         bool sync,busy;
+        bool showFx=true;
+        double fxStatusClock;
+        FxService fx=new FxService(FxService.DefaultExe());
 
         public ConditionWorkspace(Viewer view,List<SceneItem> scene) : base(view,scene,"ConditionPanel.xaml","左拖旋转 · 右拖平移 · 滚轮缩放")
         {
             library.AddRange(Scene.Select(s=>s.Spec));clips.AddRange(Scene.SelectMany(s=>s.Clips));
             modules=UI<ListBox>("Modules");states=UI<ListBox>("States");animations=UI<ComboBox>("Animations");
             xml=UI<TextBox>("Xml");flags=UI<TextBox>("Flags");
+            UI<CheckBox>("ShowFx").Click+=(s,e)=>{
+                showFx=UI<CheckBox>("ShowFx").IsChecked==true;
+                foreach(var draw in draws)draw.Effects.Clear();
+                RefreshFx();
+            };
+            UI<ComboBox>("FxBindings").SelectionChanged+=(s,e)=>UI<Button>("OpenFx").IsEnabled=UI<ComboBox>("FxBindings").SelectedItem!=null;
+            OnClick("ChooseFx",ChooseFx);OnClick("OpenFx",OpenFx);
+            View.Window.Closed+=(s,e)=>fx.Dispose();
             UI<ComboBox>("FlagsCatalog").ItemsSource=DrawRules.Flags.OrderBy(x=>x).ToArray();
             UI<ComboBox>("Mode").ItemsSource=DrawRules.Modes.OrderBy(x=>x).ToArray();
             OnClick("OpenConfig",()=>Browse("打开 GameObject.xml 或 ScriptedModelDraw","RA3 XML|*.xml"));
@@ -47,6 +59,7 @@ namespace W3xScene
             OnClick("PreviewAction",()=>{if(current!=null && current.Action!=null)PreviewAction(current.State,current.Action);});
             OnClick("NewState",()=>CreateEntry(true));
             OnClick("NewAction",()=>CreateEntry(false));
+            InitDrawEditor();
             OnClick("StateUp",()=>MoveState(true));
             OnClick("StateDown",()=>MoveState(false));
             xml.TextChanged+=(s,e)=>{if(current!=null)current.Draft=xml.Text;};
@@ -61,6 +74,42 @@ namespace W3xScene
             UI<Slider>("Frames").ValueChanged+=(s,e)=>{if(!sync && current!=null)current.Seek(UI<Slider>("Frames").Value);};
             OnClick("ApplyDuration",ApplyDuration);OnClick("ApplyAction",ApplyAction);OnClick("Generate",Generate);
             View.Status("打开单位 XML，或粘贴绘制模块后点击「应用 XML 并预览」。");
+        }
+        void ChooseFx()
+        {
+            var dlg=new Microsoft.Win32.OpenFileDialog{Title="选择特效预览器",Filter="特效预览器|FXPreview.exe"};
+            if(dlg.ShowDialog(View.Window)!=true)return;
+            foreach(var d in draws)d.Effects.Clear();
+            fx.Dispose();fx=new FxService(dlg.FileName);
+            foreach(var d in draws)d.Effects=new DrawFx(fx,d);
+            RefreshFx();
+        }
+        async void OpenFx()
+        {
+            var binding=UI<ComboBox>("FxBindings").SelectedItem as DrawFx.Binding;
+            if(binding==null)return;
+            var service=fx;
+            try
+            {
+                var url=await service.Connect();
+                if(fx==service && View.Window.IsVisible)Process.Start(new ProcessStartInfo(new Uri(url,"#"+binding.Kind+"/"+Uri.EscapeDataString(binding.Id)).AbsoluteUri){UseShellExecute=true});
+            }
+            catch(Exception ex){Report(ex);}
+        }
+        void RefreshFx()
+        {
+            var list=UI<ComboBox>("FxBindings");
+            if(showFx && current!=null && current.Visible)current.Effects.Sync(active.Contains("OVER_WATER"));
+            var bindings=showFx && current!=null && current.Visible ? current.Effects.Bindings.ToArray() : new DrawFx.Binding[0];
+            var selected=list.SelectedItem;
+            list.ItemsSource=bindings;
+            list.SelectedIndex=Math.Max(0,Array.IndexOf(bindings,selected as DrawFx.Binding));
+            UI<Button>("OpenFx").IsEnabled=list.SelectedItem!=null;
+            UI<TextBlock>("FxStatus").Text=FxStatus();
+        }
+        string FxStatus()
+        {
+            return current==null ? "" : !showFx ? "挂载特效已关闭。" : !current.Visible ? "此 Draw 已隐藏。" : current.Effects.Summary();
         }
         static XElement Selected(System.Windows.Controls.Primitives.Selector box)
         { var item=box.SelectedItem as ListBoxItem;return item==null ? null : item.Tag as XElement; }
@@ -94,6 +143,7 @@ namespace W3xScene
                 RegisterAssets(imported);
                 if(loaded.Count>0)
                 {
+                    foreach(var d in draws)d.Effects.Clear();
                     current=null;sync=true;draws.Clear();modules.Items.Clear();
                     foreach(var file in loaded)foreach(var module in file.Modules)AddModule(module,file);
                     modules.SelectedIndex=0;sync=false;
@@ -131,9 +181,10 @@ namespace W3xScene
             var clipPaths=new HashSet<string>(foundClips.Select(c=>c.Source),Import.Names);
             clips.RemoveAll(c=>clipPaths.Contains(c.Source));clips.InsertRange(0,foundClips);
         }
-        void AddModule(XElement module,DrawXmlFile sourceFile)
+        DrawPreview AddModule(XElement module,DrawXmlFile sourceFile,DrawPreview parent=null)
         {
-            var draw=new DrawPreview(module,sourceFile);draws.Add(draw);
+            var draw=new DrawPreview(module,sourceFile,parent);draws.Add(draw);
+            draw.Effects=new DrawFx(fx,draw);
             var row=new DockPanel();
             var visible=new CheckBox{IsChecked=true,Focusable=false,ToolTip="显示此 Draw",Margin=new Thickness(0,0,8,0)};
             string label=ModuleLabel(draw);
@@ -141,8 +192,9 @@ namespace W3xScene
             row.Children.Add(visible);
             row.Children.Add(new TextBlock{Text=label,ToolTip=ModuleInfo(draw),TextTrimming=TextTrimming.CharacterEllipsis});
             modules.Items.Add(row);
-            RoutedEventHandler toggle=(s,e)=>{draw.Visible=visible.IsChecked==true;Compose(false);if(current==draw)Status();};
+            RoutedEventHandler toggle=(s,e)=>{draw.Visible=visible.IsChecked==true;draw.Effects.Clear();Compose(false);if(current==draw){RefreshFx();Status();}};
             visible.Checked+=toggle;visible.Unchecked+=toggle;
+            return draw;
         }
         string ModuleLabel(DrawPreview draw){return "#"+(draws.IndexOf(draw)+1)+"   "+DrawRules.A(draw.Module,"id",draw.Module.Name.LocalName);}
         static string ModuleInfo(DrawPreview draw)
@@ -191,7 +243,7 @@ namespace W3xScene
                 if(!dialog.Show())return;
                 foreach(var batch in dialog.Imports)RegisterAssets(batch);
                 var state=createState ? dialog.State : current.State;
-                DrawRules.InsertAnimationEntry(createState ? current.Module : state,createState ? state : dialog.Action);
+                DrawRules.InsertEntry(createState ? current.Module : state,createState ? state : dialog.Action);
                 listedModule=null;SetText();PreviewAction(state,dialog.Action);
                 UI<ComboBox>("Scope").SelectedIndex=createState ? 0 : 1;
                 View.Status((createState ? "已新增动画状态   "+DrawRules.Label(state) : "已添加动作   "+DrawRules.A(dialog.Action,"AnimationName"))+
@@ -212,7 +264,7 @@ namespace W3xScene
                 var prior=current.State;var priorAction=current.Action;bool manual=current.Manual;
                 int stateIndex=DrawRules.Children(current.Module,"AnimationState").ToList().IndexOf(prior);
                 int ordinal=priorAction==null ? -1 : DrawRules.Children(prior,"Animation").ToList().IndexOf(priorAction);
-                current.Module=m;SetText();
+                current.PinnedModelRule=null;current.Module=m;SetText();
                 var row=(DockPanel)modules.SelectedItem;var name=(TextBlock)row.Children[1];
                 name.Text=ModuleLabel(current);name.ToolTip=ModuleInfo(current);
                 System.Windows.Automation.AutomationProperties.SetName((CheckBox)row.Children[0],"显示 "+name.Text);
@@ -244,7 +296,7 @@ namespace W3xScene
         bool MatchDraw(DrawPreview draw,bool transition)
         {
             string previous=DrawRules.A(draw.State,"StateName");
-            draw.Manual=false;draw.State=DrawRules.FirstAnimationState(draw.Module,active);
+            draw.Manual=false;draw.PinnedModelRule=null;draw.State=DrawRules.FirstAnimationState(draw.Module,active);
             draw.Action=draw.State==null ? null : DrawRules.Children(draw.State,"Animation").FirstOrDefault();
             bool changed=BindModel(draw);
             var trans=transition && draw.State!=null ? DrawRules.Transition(draw.State,previous) : null;
@@ -263,11 +315,13 @@ namespace W3xScene
         {return rule==null ? "" : DrawRules.A(DrawRules.Children(rule,"Model").FirstOrDefault(),"Name");}
         bool BindModel(DrawPreview draw)
         {
-            var rule=DrawRules.ModelMatches(draw.Module,active).FirstOrDefault();
+            var rule=draw.PinnedModelRule ?? DrawRules.ModelMatches(draw.Module,active).FirstOrDefault();
             var spec=ModelFor(rule);
+            if(rule!=null && !DrawRules.Children(rule,"Model").Any())
+                spec=ModelFor(DrawRules.Children(draw.Module,"ModelConditionState").FirstOrDefault(r=>DrawRules.A(r,"ParseCondStateType")=="PARSE_DEFAULT"));
             string prop=DrawRules.A(draw.Module,"Model");
             if(draw.Module.Name.LocalName=="PropDraw")spec=library.FirstOrDefault(m=>Import.Names.Equals(m.Name,prop));
-            if(draw.Manual && draw.Action!=null)
+            if(draw.PinnedModelRule==null && draw.Manual && draw.Action!=null)
             {
                 var rigs=new HashSet<string>(clips.Where(c=>Import.Names.Equals(c.Id,DrawRules.A(draw.Action,"AnimationName"))).Select(c=>c.RigId),Import.Names);
                 if(rigs.Count>0 && (spec==null || !rigs.Contains(spec.RigId)))
@@ -295,7 +349,7 @@ namespace W3xScene
                 draw.MountNote=null;
                 string bone=DrawRules.A(draw.Module,"AttachToBoneInAnotherModule");
                 if(draw.Actor==null || bone.Length==0)continue;
-                foreach(var other in draws)
+                foreach(var other in draws.Where(d=>d.Group==draw.Group).OrderByDescending(d=>ExportsBone(d,bone)))
                 {
                     var parent=other.Actor;
                     if(other.Group!=draw.Group || parent==null || parent.Spec.Rig==null || !draw.Actor.CanMountOn(parent))continue;
@@ -349,6 +403,7 @@ namespace W3xScene
                 if(animations.SelectedItem!=null)((ComboBoxItem)animations.SelectedItem).Content=DrawRules.A(draw.Action,"AnimationName");
                 UI<Button>("PreviewAction").IsEnabled=draw.Action!=null;
                 bool supportsStates=DrawRules.SupportsAnimationStates(draw.Module);
+                UpdateDrawControls(draw,supportsStates);
                 var newState=UI<Button>("NewState");var newAction=UI<Button>("NewAction");
                 newState.IsEnabled=supportsStates;newAction.IsEnabled=supportsStates && draw.State!=null;
                 newState.ToolTip=supportsStates ? "设置触发条件和首个动作" : draw.Module.Name.LocalName+" 不支持动画状态";
@@ -368,7 +423,7 @@ namespace W3xScene
                     notes.Add("此 Draw 由游戏引擎绘制特效，没有 W3X 骨骼动作。可查看和输出模块 XML");
                 if(draw.MountNote!=null)notes.Add(draw.MountNote);
                 if(draw.Action!=null && draw.FindClip(draw.Action,clips)==null)notes.Add("缺少兼容的模型或动作 "+DrawRules.A(draw.Action,"AnimationName"));
-                if(draw.State!=null && draw.State.Elements().Any(e=>e.Name.LocalName!="Animation"))notes.Add("事件及粒子保留在 XML，脚本仅预览常见状态过渡");
+                if(draw.State!=null && DrawRules.Children(draw.State,"Script").Any())notes.Add("脚本可预览开头的子对象显隐指令和常见状态过渡");
                 if(draw.Action!=null && (draw.Action.Attribute("UseWeaponTiming")!=null || draw.Action.Attribute("AnimationSpeedFactorMin")!=null ||
                     draw.Action.Attribute("AnimationSpeedFactorMax")!=null || draw.Action.Attribute("AnimationBlendTime")!=null || draw.State.Attribute("Flags")!=null))
                     notes.Add("随机、武器计时及混合效果以游戏为准");
@@ -376,7 +431,7 @@ namespace W3xScene
                 UpdateDuration();
             }
             finally{sync=false;}
-            Transport();Status();
+            RefreshFx();Transport();Status();
         }
         void UpdateDuration()
         {
@@ -400,7 +455,25 @@ namespace W3xScene
         }
         public override void Tick(double dt)
         {
-            foreach(var draw in draws)draw.Tick(dt,clips);
+            bool water=active.Contains("OVER_WATER");
+            bool refresh=false;
+            foreach(var draw in draws)
+            {
+                if(showFx && draw.Visible && draw.Effects.Sync(water) && draw==current)refresh=true;
+                draw.Tick(dt,clips);
+            }
+            if(showFx)
+            {
+                foreach(var d in draws)
+                {
+                    if(!d.Visible)continue;
+                    if(d.Effects.Sync(water) && d==current)refresh=true;
+                    d.Effects.Tick(dt);
+                }
+                if(refresh)RefreshFx();
+                fxStatusClock+=dt;
+                if(fxStatusClock>=.4){fxStatusClock=0;UI<TextBlock>("FxStatus").Text=FxStatus();}
+            }
             if(current!=null)Transport();
         }
         void ApplyAction()
@@ -439,7 +512,11 @@ namespace W3xScene
                 if(current==null || current.Draft!=current.Applied)throw new InvalidDataException("请先应用 XML 并预览。");
                 DrawRules.Validate(current.Module);
                 int scope=UI<ComboBox>("Scope").SelectedIndex;
-                var node=scope==2 ? current.Module : scope==1 ? current.Action : current.State;
+                var members=draws.Where(d=>d.Group==current.Group).ToArray();
+                bool saveGroup=scope==3 || current.SourceElementPath==null;
+                if(saveGroup && members.Any(d=>d.Draft!=d.Applied))throw new InvalidDataException("请先应用同组各 Draw 的 XML 草稿，再生成整组配置。");
+                var group=saveGroup ? GroupXml(members) : null;
+                var node=scope==3 ? group : scope==4 ? current.ModelRule : scope==2 ? current.Module : scope==1 ? current.Action : current.State;
                 if(node==null){scope=2;node=current.Module;UI<ComboBox>("Scope").SelectedIndex=scope;}
                 var output=node.ToString();var layout=new DockPanel{Margin=new Thickness(12)};
                 var footer=new Grid{Margin=new Thickness(0,8,0,0)};
@@ -453,16 +530,18 @@ namespace W3xScene
                 Grid.SetRow(button,1);Grid.SetColumn(button,1);footer.Children.Add(button);
                 Grid.SetRow(feedback,1);footer.Children.Add(feedback);
                 var draw=current;var source=draw.SourceFile;
-                var save=new Button{Content="写回原文件",Margin=new Thickness(8,0,0,0),IsEnabled=source!=null && draw.Saved!=draw.Applied};
+                if(saveGroup && draw.Group.Name.LocalName!="Draws")source=null;
+                var changes=(saveGroup?members:new[]{draw}).Where(d=>d.Saved!=d.Applied).ToArray();
+                var save=new Button{Content=saveGroup?"写回本组改动":"写回原文件",Margin=new Thickness(8,0,0,0),IsEnabled=source!=null && changes.Length>0};
                 Grid.SetRow(save,1);Grid.SetColumn(save,2);footer.Children.Add(save);
                 var destination=new TextBlock{TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,6)};
-                destination.Text=source==null ? "此 Draw 来自粘贴。通过「打开单位 XML」载入文件后即可写回。" :
-                    "写回当前完整 Draw　"+ModuleLabel(draw)+"　·　"+ModuleInfo(draw)+"\n"+source.FilePath;
-                if(source!=null && !save.IsEnabled)feedback.Text="当前 Draw 没有待写回的改动。";
+                destination.Text=source==null ? "可复制生成结果。打开含 Draws 的单位 XML 后可写回整组改动。" :
+                    (saveGroup?"写回本组 "+changes.Length+" 个 Draw 的改动":"写回当前完整 Draw　"+ModuleLabel(draw))+"　·　"+ModuleInfo(draw)+"\n"+source.FilePath;
+                if(source!=null && !save.IsEnabled)feedback.Text="没有待写回的改动。";
                 Grid.SetColumnSpan(destination,3);footer.Children.Add(destination);
                 DockPanel.SetDock(footer,Dock.Bottom);layout.Children.Add(footer);
                 var tabs=new TabControl();
-                var dialog=new Window{Title="动画配置代码",Owner=View.Window,Width=820,Height=530,Content=layout,WindowStartupLocation=WindowStartupLocation.CenterOwner};
+                var dialog=new Window{Title="Draw 配置代码",Owner=View.Window,Width=820,Height=530,Content=layout,WindowStartupLocation=WindowStartupLocation.CenterOwner};
                 int copyRequest=0;
                 dialog.Closed+=(s,e)=>copyRequest++;
                 Func<string,Task> copy=async value=>{
@@ -477,8 +556,10 @@ namespace W3xScene
                     }
                     catch(Exception err){if(request==copyRequest)feedback.Text="复制失败："+err.Message;}
                 };
-                var parts=new List<string[]>{new[]{scope==2 ? "生成结果 · Draws 内" : scope==1 ? "生成结果 · AnimationState 内" : "生成结果 · "+draw.Module.Name.LocalName+" 内",output},new[]{"导入时的模块",draw.Original}};
-                if(source!=null && scope!=2)parts.Add(new[]{"写回内容 · 整个 Draw",draw.Applied});
+                var parts=new List<string[]>{new[]{scope==3 ? "生成结果 · 整组 Draws" : scope==2 ? "生成结果 · Draws 内" : scope==1 ? "生成结果 · AnimationState 内" : "生成结果 · "+draw.Module.Name.LocalName+" 内",output}};
+                if(draw.Original.Length>0)parts.Add(new[]{"导入时的模块",draw.Original});
+                if(source!=null && saveGroup && scope!=3)parts.Add(new[]{"写回内容 · 整组 Draws",group.ToString()});
+                if(source!=null && !saveGroup && scope!=2)parts.Add(new[]{"写回内容 · 整个 Draw",draw.Applied});
                 foreach(var part in parts)
                 {
                     var box=new TextBox{Text=part[1],IsReadOnly=true,FontFamily=new System.Windows.Media.FontFamily("Consolas"),VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto};
@@ -493,8 +574,8 @@ namespace W3xScene
                     copyRequest++;
                     try
                     {
-                        source.Save(draw.SourceElementPath,draw.Module);
-                        draw.Saved=draw.Applied;save.IsEnabled=false;
+                        source.Save(changes);
+                        save.IsEnabled=false;
                         feedback.Text="已写回。上一次保存前的文件已备份为 "+Path.GetFileName(source.BackupPath);
                         View.Status("已写回 "+ModuleLabel(draw)+"　·　"+source.FilePath);
                     }
